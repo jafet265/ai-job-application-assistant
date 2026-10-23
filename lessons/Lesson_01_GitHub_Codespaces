@@ -1,0 +1,277 @@
+# Lesson 1 — Build the AI Job Application Assistant in GitHub Codespaces
+
+**Project:** AI Job Application Assistant  
+**Milestone:** 1 of 5 — Environment setup and first working web interface  
+**Goal:** Run a Streamlit application that accepts a PDF resume, extracts its text, and displays a job description. AI analysis will be added in Lesson 2.
+
+## What you will learn
+
+- Create a public GitHub portfolio repository.
+- Launch a browser-based development environment using GitHub Codespaces.
+- Create and activate a Python virtual environment on Linux.
+- Install and manage project dependencies.
+- Build a simple Streamlit user interface.
+- Extract text from a PDF with PyMuPDF.
+- Preview your application through a forwarded Codespaces port.
+- Commit and push your work to GitHub.
+
+## Step 1 — Create a GitHub repository
+
+1. Visit https://github.com/new.
+2. Name the repository `ai-job-application-assistant`.
+3. Add this description: `An AI-powered Python application that analyzes resumes against job descriptions.`
+4. Choose **Public** for a portfolio repository.
+5. Select **Add a README file**.
+6. Click **Create repository**.
+
+**Privacy note:** Do not commit real resumes, private applicant data, API keys, or `.env` files to a public repository.
+
+## Step 2 — Start GitHub Codespaces
+
+1. Open your repository.
+2. Click **Code** → **Codespaces**.
+3. Click **Create codespace on main**.
+4. Wait for the browser-based VS Code editor to open.
+5. Open **Terminal → New Terminal**.
+
+Codespaces uses a Linux environment, so its virtual-environment activation command differs from Windows PowerShell.
+
+## Step 3 — Create your Python environment
+
+Run each command in the Codespaces terminal:
+
+```bash
+python --version
+python -m venv .venv
+source .venv/bin/activate
+```
+
+The prompt should now show `(.venv)`. If `python` is not available, check `python3 --version` and use `python3 -m venv .venv`.
+
+## Step 4 — Create the project files
+
+Create this structure in the editor:
+
+```text
+ai-job-application-assistant/
+├── .gitignore
+├── app.py
+├── requirements.txt
+├── README.md
+└── lessons/
+    └── Lesson_01_GitHub_Codespaces.md
+```
+
+`README.md` was created when you initialized the repository. Create the `lessons` folder to store this guide.
+
+## Step 5 — Add dependencies
+
+Add to `requirements.txt`:
+
+```text
+streamlit>=1.40,<2.0
+PyMuPDF>=1.24,<2.0
+```
+
+Install them:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+**Why these packages?** Streamlit creates a Python-based web interface; PyMuPDF extracts embedded text from PDF documents. A scanned/image-only PDF may need OCR, which is outside this lesson.
+
+## Step 6 — Write the application
+
+Create `app.py` with this complete code:
+
+```python
+import streamlit as st
+import pymupdf
+
+
+st.set_page_config(
+    page_title="AI Job Application Assistant",
+    page_icon="🤖",
+    layout="wide",
+)
+
+
+def extract_pdf_text(uploaded_file):
+    """Extract readable text from a PDF resume."""
+    try:
+        pdf_bytes = uploaded_file.getvalue()
+
+        with pymupdf.open(
+            stream=pdf_bytes,
+            filetype="pdf"
+        ) as document:
+            text = "\n".join(
+                page.get_text()
+                for page in document
+            )
+
+        return text.strip()
+
+    except Exception as error:
+        st.error(f"PDF processing failed: {error}")
+        return ""
+
+
+def main():
+    st.title("🤖 AI Job Application Assistant")
+
+    st.write(
+        "Compare your resume with a job description "
+        "and discover opportunities for improvement."
+    )
+
+    st.divider()
+
+    resume_col, job_col = st.columns(2)
+
+    with resume_col:
+        st.subheader("📄 Your Resume")
+        uploaded_file = st.file_uploader(
+            "Upload your PDF resume",
+            type=["pdf"],
+        )
+
+    with job_col:
+        st.subheader("💼 Job Description")
+        job_description = st.text_area(
+            "Paste the job description",
+            height=200,
+        )
+
+    if st.button("Analyze Resume", type="primary"):
+        if uploaded_file is None:
+            st.warning("Please upload a PDF resume.")
+            return
+
+        if not job_description.strip():
+            st.warning("Please enter a job description.")
+            return
+
+        resume_text = extract_pdf_text(uploaded_file)
+
+        if not resume_text:
+            st.error("No readable resume text found.")
+            return
+
+        st.success("Resume processed successfully!")
+
+        st.subheader("Extracted Resume Text")
+        st.text_area(
+            "Resume content",
+            value=resume_text,
+            height=250,
+        )
+
+        st.subheader("Job Description")
+        st.text_area(
+            "Job requirements",
+            value=job_description,
+            height=250,
+        )
+
+        st.info(
+            "AI-powered analysis will be added "
+            "in Lesson 2."
+        )
+
+
+if __name__ == "__main__":
+    main()
+```
+
+### How the code works
+
+| Component | Explanation |
+|---|---|
+| `st.set_page_config()` | Sets the browser title, icon, and page width. |
+| `st.file_uploader()` | Accepts a PDF uploaded through the browser. |
+| `st.text_area()` | Accepts and displays multiline text. |
+| `st.columns(2)` | Places resume and job inputs side by side. |
+| `extract_pdf_text()` | Opens the uploaded PDF bytes and extracts page text. |
+| `st.button()` | Runs validation and extraction when clicked. |
+| `if __name__ == "__main__"` | Starts the application. |
+
+The application does **not** yet call an AI API or calculate a match score.
+
+## Step 7 — Create `.gitignore`
+
+Add the following lines:
+
+```gitignore
+.venv/
+__pycache__/
+*.pyc
+.env
+.streamlit/secrets.toml
+.pytest_cache/
+*.log
+```
+
+This prevents environment folders, local secrets, and temporary files from being uploaded to GitHub.
+
+## Step 8 — Run the application in Codespaces
+
+Start Streamlit:
+
+```bash
+python -m streamlit run app.py --server.address 0.0.0.0
+```
+
+1. Open the **Ports** tab in Codespaces.
+2. Locate port **8501**.
+3. Open its forwarded URL in a browser.
+4. If necessary, set port visibility to **Private**.
+5. Keep the terminal running while you test.
+
+You should see a title, a PDF uploader, a job-description text area, and an **Analyze Resume** button.
+
+## Step 9 — Test the application
+
+- [ ] Streamlit loads in a browser.
+- [ ] A sample PDF resume uploads successfully.
+- [ ] The job-description field accepts text.
+- [ ] Clicking Analyze Resume displays extracted resume text.
+- [ ] Clicking Analyze Resume without a PDF displays a warning.
+- [ ] Clicking Analyze Resume without a job description displays a warning.
+- [ ] An unreadable or image-only PDF displays a useful error.
+
+Use a fictional resume for public demonstrations. Codespaces preview URLs should remain private when processing personal documents.
+
+## Step 10 — Commit your work
+
+In the terminal:
+
+```bash
+git status
+git add .
+git commit -m "Build initial Streamlit resume upload interface"
+git push
+```
+
+If Git asks you to configure an author name or email, follow its prompts. Verify that `app.py`, `requirements.txt`, `.gitignore`, and the lesson file appear on GitHub, and that `.venv` does **not** appear.
+
+## Common troubleshooting
+
+**`ModuleNotFoundError: No module named 'streamlit'`** — Activate the virtual environment and run `python -m pip install -r requirements.txt`.
+
+**`streamlit: command not found`** — Use `python -m streamlit run app.py --server.address 0.0.0.0`.
+
+**The app does not open automatically** — Check the Codespaces **Ports** tab and open the forwarded URL for port 8501.
+
+**PDF shows no text** — It may be a scanned/image-only PDF. Test with a PDF containing selectable text.
+
+**Git says there is nothing to commit** — Save the files and check `git status`.
+
+## Completion criteria
+
+Lesson 1 is complete when the application runs in Codespaces, accepts a text-based PDF, displays the extracted resume text and entered job description, handles missing inputs, and is committed to GitHub.
+
+## Coming next: Lesson 2 — AI integration
+
+We'll connect a language-model API, extract required and demonstrated skills as structured data, validate the model response, and prepare the skills-matching engine. API keys will be kept out of Git.
