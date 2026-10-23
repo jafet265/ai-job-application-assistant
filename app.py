@@ -1,101 +1,59 @@
-
 import streamlit as st
 import pymupdf
+from ai_analyzer import analyze_with_ai
+from matching import calculate_match
 
-
-st.set_page_config(
-    page_title="AI Job Application Assistant",
-    page_icon="🤖",
-    layout="wide",
-)
+st.set_page_config(page_title="AI Job Application Assistant", page_icon="🤖", layout="wide")
 
 
 def extract_pdf_text(uploaded_file):
-    """Extract readable text from a PDF resume."""
     try:
-        pdf_bytes = uploaded_file.getvalue()
-
-        with pymupdf.open(
-            stream=pdf_bytes,
-            filetype="pdf"
-        ) as document:
-            text = "\n".join(
-                page.get_text()
-                for page in document
-            )
-
-        return text.strip()
-
-    except Exception as error:
-        st.error(f"PDF processing failed: {error}")
+        with pymupdf.open(stream=uploaded_file.getvalue(), filetype="pdf") as doc:
+            if doc.page_count > 15:
+                raise ValueError("Please upload a resume of 15 pages or fewer.")
+            return "\n".join(page.get_text() for page in doc).strip()
+    except Exception as exc:
+        st.error(f"Could not read PDF: {exc}")
         return ""
 
 
-def main():
-    st.title("🤖 AI Job Application Assistant")
+st.title("🤖 AI Job Application Assistant")
+st.caption("Educational skills-coverage analysis; not a hiring prediction.")
+left, right = st.columns(2)
+with left:
+    uploaded = st.file_uploader("Upload a PDF resume", type=["pdf"])
+with right:
+    job_text = st.text_area("Paste a job description", height=220)
 
-    st.write(
-        "Compare your resume with a job description "
-        "and discover opportunities for improvement."
-    )
-
-    st.divider()
-
-    resume_col, job_col = st.columns(2)
-
-    with resume_col:
-        st.subheader("📄 Your Resume")
-
-        uploaded_file = st.file_uploader(
-            "Upload your PDF resume",
-            type=["pdf"],
-        )
-
-    with job_col:
-        st.subheader("💼 Job Description")
-
-        job_description = st.text_area(
-            "Paste the job description",
-            height=200,
-        )
-
-    if st.button("Analyze Resume", type="primary"):
-
-        if uploaded_file is None:
-            st.warning("Please upload a PDF resume.")
-            return
-
-        if not job_description.strip():
-            st.warning("Please enter a job description.")
-            return
-
-        resume_text = extract_pdf_text(uploaded_file)
-
+if st.button("Analyze Resume", type="primary"):
+    if uploaded is None or not job_text.strip():
+        st.warning("Upload a resume and enter a job description.")
+    elif uploaded.size > 5 * 1024 * 1024:
+        st.error("PDF is too large (maximum 5 MB).")
+    else:
+        resume_text = extract_pdf_text(uploaded)
         if not resume_text:
-            st.error("No readable resume text found.")
-            return
-
-        st.success("Resume processed successfully!")
-
-        st.subheader("Extracted Resume Text")
-        st.text_area(
-            "Resume content",
-            value=resume_text,
-            height=250,
-        )
-
-        st.subheader("Job Description")
-        st.text_area(
-            "Job requirements",
-            value=job_description,
-            height=250,
-        )
-
-        st.info(
-            "AI-powered analysis will be added "
-            "in Lesson 2."
-        )
-
-
-if __name__ == "__main__":
-    main()
+            st.error("No selectable text found. Scanned PDFs need OCR (not supported yet).")
+        else:
+            try:
+                with st.spinner("Analyzing with AI..."):
+                    analysis = analyze_with_ai(resume_text, job_text)
+                    result = calculate_match(analysis["resume_skills"], analysis["required_skills"])
+                if result["score"] is None:
+                    st.warning("No required skills were extracted; a score cannot be calculated.")
+                else:
+                    st.metric("Required-skills coverage", f"{result['score']}%")
+                    st.write(f"Matched {len(result['matched'])} of {result['total']} required skills")
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.subheader("Matched skills")
+                    st.write(", ".join(result["matched"]) or "None identified")
+                with c2:
+                    st.subheader("Missing / unverified skills")
+                    st.write(", ".join(result["missing"]) or "None identified")
+                st.subheader("AI recommendations")
+                for recommendation in analysis["recommendations"]:
+                    st.write("• " + recommendation)
+                st.caption("AI may miss skills or infer them incorrectly. Verify all findings against the source documents.")
+            except Exception as exc:
+                st.error(f"Analysis failed: {exc}")
